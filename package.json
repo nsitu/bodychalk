@@ -1,0 +1,27 @@
+{
+  "name": "bodychalk",
+  "version": "1.0.0",
+  "description": "Trace the outline of a body via webcam segmentation and output as SVG path",
+  "homepage": "https://github.com/nsitu/bodychalk#readme",
+  "bugs": {
+    "url": "https://github.com/nsitu/bodychalk/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nsitu/bodychalk.git"
+  },
+  "license": "ISC",
+  "author": "",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "marching-squares": "^1.0.0",
+    "vite": "^7.0.2"
+  }
+}

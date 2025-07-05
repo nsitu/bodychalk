@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <link
+        rel="icon"
+        type="image/svg+xml"
+        href="/bodychalk.svg"
+    />
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no"
+    />
+    <title>bodychalk</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/body-pix@latest"></script>
+</head>
+
+<body>
+
+    <div
+        id="welcomeScreen"
+        class="welcome-overlay"
+    >
+        <div class="welcome-content">
+            <img
+                src="/bodychalk.svg"
+                alt="bodychalk Logo"
+            />
+            <p>Vector body outline via camera</p>
+            <button id="startAppBtn">Start</button>
+        </div>
+    </div>
+
+    <!-- Main app interface -->
+    <div
+        id="app"
+        style="display: none;"
+    >
+        <video
+            id="video"
+            autoplay
+            playsinline
+            muted
+            style="display: none;"
+        ></video>
+        <canvas
+            id="canvas"
+            style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 1;"
+        ></canvas>
+        <canvas
+            id="maskCanvas"
+            style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 2; mix-blend-mode: multiply;"
+        ></canvas>
+        <svg
+            id="svg"
+            style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 3; pointer-events: none;"
+        >
+            <path
+                id="bodyPath"
+                stroke="#00ff00"
+                stroke-width="3"
+                fill="none"
+            />
+        </svg>
+        <div
+            id="debug"
+            style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.7); color: white; padding: 10px; font-family: monospace; font-size: 12px; z-index: 3;"
+        >
+            Status: Initializing...
+        </div>
+    </div>
+
+    <script
+        type="module"
+        src="/src/main.js"
+    ></script>
+</body>
+
+</html>
