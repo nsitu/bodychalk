@@ -325,6 +325,12 @@ export class SimpleCameraManager {
             }
             this.drawBodyOutline(results.segmentationMask);
         } else {
+            // Clear the SVG path when no person is detected
+
+            if (bodyPath) {
+                bodyPath.setAttribute('d', '');
+            }
+
             // Show status when we're not detecting a person
             if (this.hasReceivedFirstSegmentation) {
                 this.updateDebug('Body tracking active - move into camera view');
@@ -333,6 +339,7 @@ export class SimpleCameraManager {
             }
         }
     }
+
 
     async drawBodyOutline(segmentationMask) {
         // console.log('Drawing body outline...');
