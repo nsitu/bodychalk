@@ -6,16 +6,35 @@ import { SimpleCameraManager } from './modules/simpleCamera.js';
 
 let cameraManager = null;
 
+// Start preloading the model as soon as the script loads
+const preloadModel = async () => {
+    try {
+        cameraManager = new SimpleCameraManager();
+        console.log('Starting background model preload...');
+        await cameraManager.preloadModel();
+        console.log('Model preload completed!');
+    } catch (error) {
+        console.error('Background model preload failed:', error);
+    }
+};
+
+// Start preloading immediately when the page loads
+document.addEventListener('DOMContentLoaded', () => {
+    preloadModel();
+});
+
 // Initialize app after user clicks start button
 startAppBtn.addEventListener('click', async () => {
     startAppBtn.textContent = 'Starting camera...';
     startAppBtn.disabled = true;
 
     try {
-        // Initialize camera manager
-        cameraManager = new SimpleCameraManager();
+        // Create camera manager if not already created
+        if (!cameraManager) {
+            cameraManager = new SimpleCameraManager();
+        }
 
-        // Initialize camera and body segmentation
+        // Initialize camera (model should already be preloaded)
         await cameraManager.initialize();
 
         // Hide welcome screen and show app

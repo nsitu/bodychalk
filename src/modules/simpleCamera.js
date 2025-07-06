@@ -6,10 +6,10 @@ export class SimpleCameraManager {
         this.canvas = canvas;
         this.maskCanvas = maskCanvas;
         this.ctx = this.canvas.getContext('2d');
-        
+
         // Optimize mask canvas context for frequent readback operations
         this.maskCtx = this.maskCanvas.getContext('2d', { willReadFrequently: true });
-        
+
         this.contourTracer = new ContourTracer({
             curveType: 'quadratic',
             curveTension: 0.5
@@ -21,6 +21,10 @@ export class SimpleCameraManager {
         this.reader = null;
         this.videoWidth = 640;
         this.videoHeight = 480;
+        this.hasReceivedFirstSegmentation = false;
+        this.frameProcessingCount = 0;
+        this.modelPreloaded = false;
+        this.modelPreloadPromise = null;
     }
 
     updateDebug(message) {
@@ -132,33 +136,100 @@ export class SimpleCameraManager {
         });
     }
 
+    // New method to preload the model in background
+    async preloadModel() {
+        if (this.modelPreloadPromise) {
+            return this.modelPreloadPromise; // Return existing promise if already started
+        }
+
+        this.modelPreloadPromise = new Promise(async (resolve, reject) => {
+            try {
+                console.log('Starting background model preload...');
+
+                // Wait for MediaPipe to be available
+                await this.waitForMediaPipe();
+
+                // Create a temporary pose instance just to trigger model download
+                const tempPose = new window.Pose({
+                    locateFile: (file) => {
+                        console.log('Preloading MediaPipe file:', file);
+                        return `https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/${file}`;
+                    }
+                });
+
+                // Set options to trigger model initialization
+                tempPose.setOptions({
+                    modelComplexity: 1,
+                    smoothLandmarks: true,
+                    enableSegmentation: true,
+                    smoothSegmentation: true,
+                    minDetectionConfidence: 0.5,
+                    minTrackingConfidence: 0.5
+                });
+
+                // Wait for model to be ready by sending a dummy frame
+                const canvas = new OffscreenCanvas(64, 64);
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = 'black';
+                ctx.fillRect(0, 0, 64, 64);
+                
+                tempPose.onResults((results) => {
+                    console.log('Model preload complete - received dummy results');
+                    this.modelPreloaded = true;
+                    resolve(tempPose);
+                });
+
+                // Send dummy frame to initialize model
+                const bitmap = await createImageBitmap(canvas);
+                await tempPose.send({ image: bitmap });
+                bitmap.close();
+
+            } catch (error) {
+                console.error('Model preload failed:', error);
+                reject(error);
+            }
+        });
+
+        return this.modelPreloadPromise;
+    }
+
     async initializeBlazePose() {
         try {
             this.updateDebug('Loading AI model...');
 
-            // Wait for MediaPipe Pose to be available
-            await this.waitForMediaPipe();
+            if (this.modelPreloaded && this.modelPreloadPromise) {
+                // Use the preloaded model
+                this.updateDebug('Using preloaded AI model...');
+                this.blazePose = await this.modelPreloadPromise;
+            } else {
+                // Fallback to normal loading
+                this.updateDebug('Loading AI model...');
+                await this.waitForMediaPipe();
 
-            console.log('Using MediaPipe BlazePose');
+                this.blazePose = new window.Pose({
+                    locateFile: (file) => {
+                        console.log('Loading MediaPipe file:', file);
+                        if (file.includes('.wasm')) {
+                            this.updateDebug('Downloading AI model weights... (this may take a moment)');
+                        }
+                        return `https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/${file}`;
+                    }
+                });
 
-            this.blazePose = new window.Pose({
-                locateFile: (file) => {
-                    return `https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/${file}`;
-                }
-            });
+                this.blazePose.setOptions({
+                    modelComplexity: 1,
+                    smoothLandmarks: true,
+                    enableSegmentation: true,
+                    smoothSegmentation: true,
+                    minDetectionConfidence: 0.5,
+                    minTrackingConfidence: 0.5
+                });
+            }
 
-            this.blazePose.setOptions({
-                modelComplexity: 1,
-                smoothLandmarks: true,
-                enableSegmentation: true,
-                smoothSegmentation: true,
-                minDetectionConfidence: 0.5,
-                minTrackingConfidence: 0.5
-            });
-
+            this.updateDebug('Connecting AI model to camera stream...');
             this.blazePose.onResults(this.onPoseResults.bind(this));
 
-            this.updateDebug('AI model loaded! Body tracking active.');
+            this.updateDebug('AI model ready! Body tracking active.');
             console.log('MediaPipe BlazePose initialized successfully');
 
         } catch (error) {
@@ -173,10 +244,10 @@ export class SimpleCameraManager {
         return new Promise((resolve, reject) => {
             let attempts = 0;
             const maxAttempts = 50; // 5 seconds max wait
-            
+
             const checkMediaPipe = () => {
                 attempts++;
-                
+
                 if (typeof window.Pose !== 'undefined') {
                     console.log('MediaPipe Pose is ready');
                     resolve();
@@ -187,13 +258,20 @@ export class SimpleCameraManager {
                     setTimeout(checkMediaPipe, 100);
                 }
             };
-            
+
             checkMediaPipe();
         });
     }
 
     async processFrame(frame) {
         try {
+            this.frameProcessingCount++;
+            
+            // Show periodic updates about frame processing
+            if (this.frameProcessingCount % 30 === 0) { // Every 30 frames (~1 second at 30fps)
+                this.updateDebug(`Processing frames... (${this.frameProcessingCount} processed)`);
+            }
+
             // Create ImageBitmap from VideoFrame for efficient processing
             const bitmap = await createImageBitmap(frame);
 
@@ -214,8 +292,26 @@ export class SimpleCameraManager {
     }
 
     onPoseResults(results) {
+        console.log('Pose results received:', {
+            hasSegmentationMask: !!results.segmentationMask,
+            hasLandmarks: !!results.poseLandmarks,
+            timestamp: Date.now()
+        });
+
         if (results.segmentationMask) {
+            // Update status when we get our first segmentation
+            if (!this.hasReceivedFirstSegmentation) {
+                this.hasReceivedFirstSegmentation = true;
+                this.updateDebug('First body detection received! Drawing outline...');
+            }
             this.drawBodyOutline(results.segmentationMask);
+        } else {
+            // Show status when we're not detecting a person
+            if (this.hasReceivedFirstSegmentation) {
+                this.updateDebug('Body tracking active - move into camera view');
+            } else {
+                this.updateDebug('Body tracking active - waiting for person detection...');
+            }
         }
     }
 
