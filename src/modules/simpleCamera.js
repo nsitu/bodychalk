@@ -177,11 +177,11 @@ export class SimpleCameraManager {
         try {
             console.log('Segmentation mask type:', typeof segmentationMask);
             console.log('Segmentation mask:', segmentationMask);
-            
+
             // Handle different MediaPipe segmentation mask formats
             let imageData;
             let width, height;
-            
+
             if (segmentationMask instanceof ImageData) {
                 // Already ImageData
                 imageData = segmentationMask;
@@ -221,7 +221,7 @@ export class SimpleCameraManager {
             // Create binary mask from alpha channel or red channel
             const binaryMask = new Array(width * height);
             let personPixelCount = 0;
-            
+
             for (let i = 0; i < width * height; i++) {
                 // MediaPipe segmentation often uses alpha channel or red channel
                 let maskValue;
@@ -235,7 +235,7 @@ export class SimpleCameraManager {
                     // Fallback to red channel
                     maskValue = data[i * 4];
                 }
-                
+
                 binaryMask[i] = maskValue > 128 ? 1 : 0;
                 if (binaryMask[i] === 1) personPixelCount++;
             }
@@ -280,7 +280,7 @@ export class SimpleCameraManager {
                     try {
                         // Send video frame to MediaPipe Pose
                         await this.blazePose.send({ image: this.video });
-                        
+
                         // Results will be handled by onPoseResults callback
                     } catch (segError) {
                         console.error('Segmentation error:', segError);
