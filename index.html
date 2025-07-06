@@ -29,7 +29,15 @@
                 alt="bodychalk Logo"
             />
             <p>Vector body outline via camera</p>
-            <button id="startAppBtn">Start</button>
+            <div id="loading-spinner">
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+            </div>
+            <button id="startAppBtn">
+                Start
+            </button>
         </div>
     </div>
 
@@ -38,14 +46,6 @@
         id="app"
         style="display: none;"
     >
-        <canvas
-            id="canvas"
-            style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 1; display: none;"
-        ></canvas>
-        <canvas
-            id="maskCanvas"
-            style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 2; display: none;"
-        ></canvas>
         <svg
             id="svg"
             style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 3; pointer-events: none;"
@@ -65,6 +65,10 @@
         </div>
         <button id="cameraToggle"><span class="material-symbols-outlined">
                 cameraswitch
+            </span></button>
+
+        <button id="downloadFile"><span class="material-symbols-outlined">
+                download
             </span></button>
     </div>
 

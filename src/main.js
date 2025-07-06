@@ -3,26 +3,32 @@ import './style.css'
 
 // main.js
 import { loadIcons } from './modules/iconLoader.js';
-const iconNames = ['cameraswitch'];
+const iconNames = ['cameraswitch', 'download'];
 loadIcons(iconNames);
 
-import { startAppBtn, welcomeScreen, app } from './modules/domElements.js';
-import { SimpleCameraManager } from './modules/simpleCamera.js';
+import { startAppBtn, welcomeScreen, app, loadingSpinner, cameraToggle } from './modules/domElements.js';
+import { CameraManager } from './modules/camera.js';
+import { PoseProcessor } from './modules/poseProcessor.js';
+import { DownloadManager } from './modules/download.js';
 
 let cameraManager = null;
+let poseProcessor = null;
+let downloadManager = null;
+let processingLoop = null;
 
-// Start preloading the model as soon as the script loads
-const preloadModel = async () => {
+// Start preloading immediately when the page loads
+document.addEventListener('DOMContentLoaded', async () => {
     try {
-        // Show loading state
-        startAppBtn.textContent = 'Loading...';
-        startAppBtn.disabled = true;
+        // Initialize both managers
+        cameraManager = new CameraManager();
+        poseProcessor = new PoseProcessor();
 
-        cameraManager = new SimpleCameraManager();
         console.log('Starting background model preload...');
-        await cameraManager.preloadModel();
+        await poseProcessor.preloadModel();
         console.log('Model preload completed!');
 
+        loadingSpinner.style.display = 'none';
+        startAppBtn.style.display = 'inline-block';
         // Enable the start button once model is loaded
         startAppBtn.textContent = 'Start';
         startAppBtn.disabled = false;
@@ -36,20 +42,15 @@ const preloadModel = async () => {
 
         // Allow retry by clicking the button
         startAppBtn.addEventListener('click', () => {
-            preloadModel();
+            location.reload(); // Simple retry by reloading the page
         }, { once: true });
     }
-};
-
-// Start preloading immediately when the page loads
-document.addEventListener('DOMContentLoaded', () => {
-    preloadModel();
 });
 
 // Initialize app after user clicks start button
 startAppBtn.addEventListener('click', async () => {
     // Only proceed if the model is loaded
-    if (!cameraManager || startAppBtn.textContent !== 'Start') {
+    if (!cameraManager || !poseProcessor || startAppBtn.textContent !== 'Start') {
         return;
     }
 
@@ -57,8 +58,23 @@ startAppBtn.addEventListener('click', async () => {
     startAppBtn.disabled = true;
 
     try {
-        // Initialize camera (model should already be preloaded)
-        await cameraManager.initialize();
+        // Initialize camera
+        const cameraInfo = await cameraManager.initialize();
+
+        // Initialize pose processor with camera dimensions
+        poseProcessor.setDimensions(cameraInfo.width, cameraInfo.height);
+        await poseProcessor.initializeBlazePose();
+
+        // Initialize download manager
+        downloadManager = new DownloadManager(cameraManager);
+
+        // Set up camera toggle if multiple cameras available
+        if (cameraManager.hasMultipleCamerasAvailable()) {
+            cameraToggle.addEventListener('click', toggleCamera);
+        }
+
+        // Start processing loop
+        startProcessingLoop();
 
         // Hide welcome screen and show app
         welcomeScreen.style.display = 'none';
@@ -81,5 +97,57 @@ startAppBtn.addEventListener('click', async () => {
 
         startAppBtn.textContent = errorMessage;
         startAppBtn.disabled = false;
+    }
+});
+
+// Processing loop to handle camera frames
+async function startProcessingLoop() {
+    try {
+        // Get the frame stream from camera
+        const frameStream = cameraManager.getFrameStream();
+
+        // Process frames
+        for await (const frame of frameStream) {
+            // Process each frame with pose processor
+            await poseProcessor.processFrame(frame);
+        }
+    } catch (error) {
+        console.error('Processing loop error:', error);
+    }
+}
+
+// Camera toggle functionality
+async function toggleCamera() {
+    try {
+        cameraToggle.disabled = true;
+
+        // Stop current processing
+        if (processingLoop) {
+            cameraManager.stop();
+        }
+
+        // Toggle camera
+        const newCameraInfo = await cameraManager.toggleCamera();
+
+        // Update pose processor with new dimensions
+        poseProcessor.setDimensions(newCameraInfo.width, newCameraInfo.height);
+
+        // Restart processing loop
+        startProcessingLoop();
+
+    } catch (error) {
+        console.error('Camera toggle failed:', error);
+    } finally {
+        cameraToggle.disabled = false;
+    }
+}
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', () => {
+    if (cameraManager) {
+        cameraManager.stop();
+    }
+    if (poseProcessor) {
+        poseProcessor.cleanup();
     }
 });
