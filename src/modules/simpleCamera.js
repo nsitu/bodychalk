@@ -139,7 +139,7 @@ export class SimpleCameraManager {
     // New method to preload the model in background
     async preloadModel() {
         if (this.modelPreloadPromise) {
-            return this.modelPreloadPromise; // Return existing promise if already started
+            return this.modelPreloadPromise;
         }
 
         this.modelPreloadPromise = new Promise(async (resolve, reject) => {
@@ -175,6 +175,8 @@ export class SimpleCameraManager {
                 
                 tempPose.onResults((results) => {
                     console.log('Model preload complete - received dummy results');
+                    // Store the preloaded model
+                    this.blazePose = tempPose;
                     this.modelPreloaded = true;
                     resolve(tempPose);
                 });
