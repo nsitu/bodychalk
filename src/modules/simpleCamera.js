@@ -12,7 +12,7 @@ export class SimpleCameraManager {
         this.isProcessing = false;
         this.animationId = null;
         this.debugElement = debugElement;
-        this.bodyPix = null;
+        this.blazePose = null;
     }
 
     updateDebug(message) {
@@ -62,9 +62,9 @@ export class SimpleCameraManager {
 
             this.updateDebug('Camera ready! Loading AI model...');
 
-            // Initialize BodyPix after camera is working
+            // Initialize BlazePose after camera is working
             setTimeout(() => {
-                this.initializeBodyPix();
+                this.initializeBlazePose();
             }, 1000);
 
             return true;
@@ -130,44 +130,124 @@ export class SimpleCameraManager {
         });
     }
 
-    async initializeBodyPix() {
+    async initializeBlazePose() {
         try {
             this.updateDebug('Loading AI model...');
 
-            // Initialize TensorFlow.js BodyPix
-            if (typeof bodyPix === 'undefined') {
-                throw new Error('TensorFlow.js BodyPix not loaded');
+            // Initialize MediaPipe Pose
+            if (typeof window.Pose === 'undefined') {
+                throw new Error('MediaPipe Pose not loaded');
             }
 
-            console.log('Using TensorFlow.js BodyPix');
+            console.log('Using MediaPipe BlazePose');
 
-            // Initialize TensorFlow.js backend first
-            if (typeof tf !== 'undefined') {
-                console.log('Initializing TensorFlow.js backend...');
-                await tf.ready();
-                console.log('TensorFlow.js backend ready');
-            }
-
-            this.bodyPix = await bodyPix.load({
-                architecture: 'MobileNetV1',
-                outputStride: 16,
-                multiplier: 0.5,
-                quantBytes: 2
+            this.blazePose = new window.Pose({
+                locateFile: (file) => {
+                    return `https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/${file}`;
+                }
             });
 
+            this.blazePose.setOptions({
+                modelComplexity: 1,
+                smoothLandmarks: true,
+                enableSegmentation: true,
+                smoothSegmentation: true,
+                minDetectionConfidence: 0.5,
+                minTrackingConfidence: 0.5
+            });
+
+            this.blazePose.onResults(this.onPoseResults.bind(this));
+
             this.updateDebug('AI model loaded! Body tracking active.');
-            console.log('TensorFlow.js BodyPix initialized successfully');
+            console.log('MediaPipe BlazePose initialized successfully');
 
         } catch (error) {
-            console.error('Body segmentation initialization failed:', error);
+            console.error('Pose segmentation initialization failed:', error);
             this.updateDebug(`AI model error: ${error.message}`);
         }
     }
 
-    drawBodyOutline(segmentation) {
+    onPoseResults(results) {
+        if (results.segmentationMask) {
+            this.drawBodyOutline(results.segmentationMask);
+        }
+    }
+
+    async drawBodyOutline(segmentationMask) {
         try {
-            // For minimalist mode, skip the mask visualization
-            // Only extract contours and draw the SVG outline
+            console.log('Segmentation mask type:', typeof segmentationMask);
+            console.log('Segmentation mask:', segmentationMask);
+            
+            // Handle different MediaPipe segmentation mask formats
+            let imageData;
+            let width, height;
+            
+            if (segmentationMask instanceof ImageData) {
+                // Already ImageData
+                imageData = segmentationMask;
+                width = imageData.width;
+                height = imageData.height;
+            } else if (segmentationMask.data && segmentationMask.width && segmentationMask.height) {
+                // Custom format with data, width, height
+                width = segmentationMask.width;
+                height = segmentationMask.height;
+                imageData = {
+                    data: segmentationMask.data,
+                    width: width,
+                    height: height
+                };
+            } else if (segmentationMask.arrayBuffer) {
+                // ArrayBuffer format - need to convert
+                const buffer = await segmentationMask.arrayBuffer();
+                const uint8Array = new Uint8Array(buffer);
+                width = this.video.videoWidth;
+                height = this.video.videoHeight;
+                imageData = {
+                    data: uint8Array,
+                    width: width,
+                    height: height
+                };
+            } else {
+                // Try to draw on canvas to get ImageData
+                this.maskCtx.clearRect(0, 0, this.maskCanvas.width, this.maskCanvas.height);
+                this.maskCtx.drawImage(segmentationMask, 0, 0);
+                imageData = this.maskCtx.getImageData(0, 0, this.maskCanvas.width, this.maskCanvas.height);
+                width = imageData.width;
+                height = imageData.height;
+            }
+
+            const data = imageData.data;
+
+            // Create binary mask from alpha channel or red channel
+            const binaryMask = new Array(width * height);
+            let personPixelCount = 0;
+            
+            for (let i = 0; i < width * height; i++) {
+                // MediaPipe segmentation often uses alpha channel or red channel
+                let maskValue;
+                if (data.length === width * height * 4) {
+                    // RGBA format - use alpha channel or red channel
+                    maskValue = data[i * 4 + 3] || data[i * 4]; // Alpha or Red
+                } else if (data.length === width * height) {
+                    // Grayscale format
+                    maskValue = data[i];
+                } else {
+                    // Fallback to red channel
+                    maskValue = data[i * 4];
+                }
+                
+                binaryMask[i] = maskValue > 128 ? 1 : 0;
+                if (binaryMask[i] === 1) personPixelCount++;
+            }
+
+            console.log(`Mask dimensions: ${width}x${height}, Person pixels: ${personPixelCount}`);
+
+            // Create segmentation object compatible with ContourTracer
+            const segmentation = {
+                width: width,
+                height: height,
+                data: binaryMask
+            };
 
             // Extract contours
             const contours = this.contourTracer.extractContours(segmentation);
@@ -195,24 +275,13 @@ export class SimpleCameraManager {
             try {
                 frameCount++;
 
-
-                // Only try body segmentation if bodyPix is initialized
-                if (this.bodyPix && frameCount % 5 === 0) {
+                // Only try pose segmentation if blazePose is initialized
+                if (this.blazePose && frameCount % 5 === 0) {
                     try {
-                        // Use TensorFlow.js BodyPix API
-                        const segmentation = await this.bodyPix.segmentPerson(this.video, {
-                            internalResolution: 'medium',
-                            segmentationThreshold: 0.3,  // Lower threshold for better detection
-                            maxDetections: 1,
-                            scoreThreshold: 0.3,
-                            nmsRadius: 20
-                        });
-
-                        // Draw body outline if we got segmentation data
-                        if (segmentation) {
-                            this.drawBodyOutline(segmentation);
-                        }
-
+                        // Send video frame to MediaPipe Pose
+                        await this.blazePose.send({ image: this.video });
+                        
+                        // Results will be handled by onPoseResults callback
                     } catch (segError) {
                         console.error('Segmentation error:', segError);
                     }

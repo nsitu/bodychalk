@@ -9,11 +9,11 @@ export class ContourTracer {
             console.log('Processing segmentation...');
         }
 
-        // Handle TensorFlow.js BodyPix segmentation format
+        // Handle different segmentation formats
         let width, height, maskData;
 
         if (segmentation.width && segmentation.height && segmentation.data) {
-            // TensorFlow.js BodyPix format
+            // Our custom format from BlazePose or TensorFlow.js BodyPix
             width = segmentation.width;
             height = segmentation.height;
             maskData = segmentation.data;
@@ -33,8 +33,9 @@ export class ContourTracer {
             const value = maskData[i];
             otherValues.add(value);
 
-            // TensorFlow.js BodyPix uses 0 for background, 1 for person
-            // But let's also check for other possible values
+            // Handle different mask formats:
+            // - Binary masks: 0 for background, 1 for person
+            // - Probability masks: 0.0-1.0 range
             if (value === 1) {
                 mask[i] = 1;
                 personPixelCount++;
@@ -42,7 +43,7 @@ export class ContourTracer {
                 mask[i] = 0;
                 backgroundPixelCount++;
             } else {
-                // Some other value - let's treat anything > 0.5 as person
+                // Some other value - treat anything > 0.5 as person
                 mask[i] = value > 0.5 ? 1 : 0;
                 if (mask[i] === 1) personPixelCount++;
                 else backgroundPixelCount++;
