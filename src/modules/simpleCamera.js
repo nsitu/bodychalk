@@ -8,7 +8,10 @@ export class SimpleCameraManager {
         this.maskCanvas = maskCanvas;
         this.ctx = this.canvas.getContext('2d');
         this.maskCtx = this.maskCanvas.getContext('2d');
-        this.contourTracer = new ContourTracer();
+        this.contourTracer = new ContourTracer({
+            curveType: 'quadratic',
+            curveTension: 0.5
+        });
         this.isProcessing = false;
         this.animationId = null;
         this.debugElement = debugElement;

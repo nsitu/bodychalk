@@ -1,6 +1,8 @@
 export class ContourTracer {
-    constructor() {
-        this.threshold = 0.5;
+    constructor(options = {}) {
+        this.threshold = options.threshold || 0.5;
+        this.curveType = options.curveType || 'quadratic'; // 'straight' or 'quadratic'
+        this.curveTension = options.curveTension || 0.5; // 0-1, affects curve smoothness
     }
 
     extractContours(segmentation) {
@@ -243,16 +245,53 @@ export class ContourTracer {
 
         contours.forEach((contour, index) => {
             if (contour.length > 0) {
-                pathData += `M ${contour[0][0]} ${contour[0][1]} `;
-
-                for (let i = 1; i < contour.length; i++) {
-                    pathData += `L ${contour[i][0]} ${contour[i][1]} `;
+                if (this.curveType === 'quadratic') {
+                    pathData += this.contourToQuadraticSVGPath(contour);
+                } else {
+                    pathData += this.contourToStraightSVGPath(contour);
                 }
-
-                pathData += 'Z ';
             }
         });
 
+        return pathData;
+    }
+
+    contourToStraightSVGPath(contour) {
+        let pathData = `M ${contour[0][0]} ${contour[0][1]} `;
+        for (let i = 1; i < contour.length; i++) {
+            pathData += `L ${contour[i][0]} ${contour[i][1]} `;
+        }
+        pathData += 'Z ';
+        return pathData;
+    }
+
+    contourToQuadraticSVGPath(contour) {
+        if (contour.length < 3) {
+            // Not enough points for curves, fall back to straight lines
+            return this.contourToStraightSVGPath(contour);
+        }
+
+        let pathData = `M ${contour[0][0]} ${contour[0][1]} `;
+
+        // Create smooth quadratic curves by using midpoints
+        for (let i = 0; i < contour.length; i++) {
+            const current = contour[i];
+            const next = contour[(i + 1) % contour.length];
+            const nextNext = contour[(i + 2) % contour.length];
+            
+            // Calculate midpoint between current and next
+            const midX = (current[0] + next[0]) / 2;
+            const midY = (current[1] + next[1]) / 2;
+            
+            // Calculate midpoint between next and next-next
+            const nextMidX = (next[0] + nextNext[0]) / 2;
+            const nextMidY = (next[1] + nextNext[1]) / 2;
+            
+            // Use next point as control point, next midpoint as end point
+            pathData += `Q ${next[0]} ${next[1]} ${nextMidX} ${nextMidY} `;
+        }
+
+        pathData += 'Z ';
         return pathData;
     }
 }
