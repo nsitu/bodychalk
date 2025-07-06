@@ -6,7 +6,10 @@ export class SimpleCameraManager {
         this.canvas = canvas;
         this.maskCanvas = maskCanvas;
         this.ctx = this.canvas.getContext('2d');
-        this.maskCtx = this.maskCanvas.getContext('2d');
+        
+        // Optimize mask canvas context for frequent readback operations
+        this.maskCtx = this.maskCanvas.getContext('2d', { willReadFrequently: true });
+        
         this.contourTracer = new ContourTracer({
             curveType: 'quadratic',
             curveTension: 0.5
@@ -71,10 +74,8 @@ export class SimpleCameraManager {
 
             this.updateDebug('Camera ready! Loading AI model...');
 
-            // Initialize BlazePose
-            setTimeout(() => {
-                this.initializeBlazePose();
-            }, 1000);
+            // Initialize BlazePose when dependencies are ready
+            await this.initializeBlazePose();
 
             return true;
         } catch (error) {
@@ -135,10 +136,8 @@ export class SimpleCameraManager {
         try {
             this.updateDebug('Loading AI model...');
 
-            // Initialize MediaPipe Pose
-            if (typeof window.Pose === 'undefined') {
-                throw new Error('MediaPipe Pose not loaded');
-            }
+            // Wait for MediaPipe Pose to be available
+            await this.waitForMediaPipe();
 
             console.log('Using MediaPipe BlazePose');
 
@@ -165,14 +164,39 @@ export class SimpleCameraManager {
         } catch (error) {
             console.error('Pose segmentation initialization failed:', error);
             this.updateDebug(`AI model error: ${error.message}`);
+            throw error;
         }
+    }
+
+    // Helper method to wait for MediaPipe to be available
+    async waitForMediaPipe() {
+        return new Promise((resolve, reject) => {
+            let attempts = 0;
+            const maxAttempts = 50; // 5 seconds max wait
+            
+            const checkMediaPipe = () => {
+                attempts++;
+                
+                if (typeof window.Pose !== 'undefined') {
+                    console.log('MediaPipe Pose is ready');
+                    resolve();
+                } else if (attempts >= maxAttempts) {
+                    reject(new Error('MediaPipe Pose failed to load within timeout'));
+                } else {
+                    // Check again in 100ms
+                    setTimeout(checkMediaPipe, 100);
+                }
+            };
+            
+            checkMediaPipe();
+        });
     }
 
     async processFrame(frame) {
         try {
             // Create ImageBitmap from VideoFrame for efficient processing
             const bitmap = await createImageBitmap(frame);
-            
+
             // Send to MediaPipe if available
             if (this.blazePose) {
                 await this.blazePose.send({ image: bitmap });
@@ -196,73 +220,32 @@ export class SimpleCameraManager {
     }
 
     async drawBodyOutline(segmentationMask) {
+        // console.log('Drawing body outline...');
         try {
             console.log('Segmentation mask type:', typeof segmentationMask);
             console.log('Segmentation mask:', segmentationMask);
+            console.log('Processing ImageBitmap segmentation mask...');
 
-            // Handle different MediaPipe segmentation mask formats
-            let imageData;
-            let width, height;
+            // Since segmentationMask is ImageBitmap, draw it to canvas to get ImageData
+            this.maskCtx.clearRect(0, 0, this.maskCanvas.width, this.maskCanvas.height);
+            this.maskCtx.drawImage(segmentationMask, 0, 0);
 
-            if (segmentationMask instanceof ImageData) {
-                // Already ImageData
-                imageData = segmentationMask;
-                width = imageData.width;
-                height = imageData.height;
-            } else if (segmentationMask.data && segmentationMask.width && segmentationMask.height) {
-                // Custom format with data, width, height
-                width = segmentationMask.width;
-                height = segmentationMask.height;
-                imageData = {
-                    data: segmentationMask.data,
-                    width: width,
-                    height: height
-                };
-            } else if (segmentationMask.arrayBuffer) {
-                // ArrayBuffer format - need to convert
-                const buffer = await segmentationMask.arrayBuffer();
-                const uint8Array = new Uint8Array(buffer);
-                width = this.videoWidth;
-                height = this.videoHeight;
-                imageData = {
-                    data: uint8Array,
-                    width: width,
-                    height: height
-                };
-            } else {
-                // Try to draw on canvas to get ImageData
-                this.maskCtx.clearRect(0, 0, this.maskCanvas.width, this.maskCanvas.height);
-                this.maskCtx.drawImage(segmentationMask, 0, 0);
-                imageData = this.maskCtx.getImageData(0, 0, this.maskCanvas.width, this.maskCanvas.height);
-                width = imageData.width;
-                height = imageData.height;
-            }
-
+            const imageData = this.maskCtx.getImageData(0, 0, this.maskCanvas.width, this.maskCanvas.height);
+            const width = imageData.width;
+            const height = imageData.height;
             const data = imageData.data;
 
-            // Create binary mask from alpha channel or red channel
+            // Create binary mask from the ImageData
             const binaryMask = new Array(width * height);
             let personPixelCount = 0;
 
+            // MediaPipe uses the alpha channel for segmentation
             for (let i = 0; i < width * height; i++) {
-                // MediaPipe segmentation often uses alpha channel or red channel
-                let maskValue;
-                if (data.length === width * height * 4) {
-                    // RGBA format - use alpha channel or red channel
-                    maskValue = data[i * 4 + 3] || data[i * 4]; // Alpha or Red
-                } else if (data.length === width * height) {
-                    // Grayscale format
-                    maskValue = data[i];
-                } else {
-                    // Fallback to red channel
-                    maskValue = data[i * 4];
-                }
-
-                binaryMask[i] = maskValue > 128 ? 1 : 0;
+                const pixelIndex = i * 4;
+                const alpha = data[pixelIndex + 3];
+                binaryMask[i] = alpha > 128 ? 1 : 0;
                 if (binaryMask[i] === 1) personPixelCount++;
             }
-
-            console.log(`Mask dimensions: ${width}x${height}, Person pixels: ${personPixelCount}`);
 
             // Create segmentation object compatible with ContourTracer
             const segmentation = {
@@ -298,7 +281,7 @@ export class SimpleCameraManager {
                 if (done) break;
 
                 frameCount++;
-                
+
                 // Process every 3rd frame for better performance
                 if (frameCount % 3 === 0) {
                     await this.processFrame(frame);
@@ -315,7 +298,7 @@ export class SimpleCameraManager {
 
     stop() {
         this.isProcessing = false;
-        
+
         // Stop the stream reader
         if (this.reader) {
             this.reader.releaseLock();
