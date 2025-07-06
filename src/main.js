@@ -1,4 +1,4 @@
-
+import './modules/polyfillMSTP.js';
 import './style.css'
 
 import { startAppBtn, welcomeScreen, app } from './modules/domElements.js';

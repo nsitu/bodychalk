@@ -1,9 +1,8 @@
-import { video, canvas, debugElement, maskCanvas, bodyPath } from './domElements.js';
+import { canvas, debugElement, maskCanvas, bodyPath } from './domElements.js';
 import { ContourTracer } from './contour.js';
 
 export class SimpleCameraManager {
     constructor() {
-        this.video = video;
         this.canvas = canvas;
         this.maskCanvas = maskCanvas;
         this.ctx = this.canvas.getContext('2d');
@@ -13,9 +12,12 @@ export class SimpleCameraManager {
             curveTension: 0.5
         });
         this.isProcessing = false;
-        this.animationId = null;
         this.debugElement = debugElement;
         this.blazePose = null;
+        this.stream = null;
+        this.reader = null;
+        this.videoWidth = 640;
+        this.videoHeight = 480;
     }
 
     updateDebug(message) {
@@ -29,43 +31,47 @@ export class SimpleCameraManager {
         try {
             this.updateDebug('Requesting camera access...');
 
-            // Get user media
-            const stream = await navigator.mediaDevices.getUserMedia({
+            // Get user media stream
+            this.stream = await navigator.mediaDevices.getUserMedia({
                 video: {
-                    width: { ideal: 640 },
-                    height: { ideal: 480 },
+                    width: { ideal: this.videoWidth },
+                    height: { ideal: this.videoHeight },
                     facingMode: 'user'
                 }
             });
 
-            this.updateDebug('Camera access granted, setting up video...');
-            this.video.srcObject = stream;
+            this.updateDebug('Camera access granted, setting up stream processor...');
 
-            // Wait for video to load
-            await new Promise((resolve) => {
-                this.video.onloadedmetadata = () => {
-                    this.updateDebug('Video loaded, setting up canvas...');
-                    // Ensure video starts playing
-                    this.video.play().then(() => {
-                        console.log('Video is now playing');
-                        resolve();
-                    }).catch(error => {
-                        console.error('Error starting video playback:', error);
-                        resolve(); // Continue anyway
-                    });
-                };
-            });
+            // Check if MediaStreamTrackProcessor is supported
+            if (!window.MediaStreamTrackProcessor) {
+                throw new Error('MediaStreamTrackProcessor not supported in this browser');
+            }
+
+            // Get video track and create processor
+            const track = this.stream.getVideoTracks()[0];
+            const processor = new MediaStreamTrackProcessor({ track });
+            this.reader = processor.readable.getReader();
+
+            // Get first frame to determine actual dimensions
+            const { value: firstFrame } = await this.reader.read();
+            this.videoWidth = firstFrame.displayWidth;
+            this.videoHeight = firstFrame.displayHeight;
+
+            this.updateDebug('Stream processor ready, setting up canvas...');
 
             // Set canvas dimensions
             this.setupCanvas();
 
-            this.updateDebug('Starting video feed...');
-            // Start processing
+            // Process the first frame
+            await this.processFrame(firstFrame);
+
+            this.updateDebug('Starting frame processing...');
+            // Start processing frames
             this.startProcessing();
 
             this.updateDebug('Camera ready! Loading AI model...');
 
-            // Initialize BlazePose after camera is working
+            // Initialize BlazePose
             setTimeout(() => {
                 this.initializeBlazePose();
             }, 1000);
@@ -79,17 +85,14 @@ export class SimpleCameraManager {
     }
 
     setupCanvas() {
-        const videoWidth = this.video.videoWidth;
-        const videoHeight = this.video.videoHeight;
-
         // Set canvas dimensions
-        this.canvas.width = videoWidth;
-        this.canvas.height = videoHeight;
-        this.maskCanvas.width = videoWidth;
-        this.maskCanvas.height = videoHeight;
+        this.canvas.width = this.videoWidth;
+        this.canvas.height = this.videoHeight;
+        this.maskCanvas.width = this.videoWidth;
+        this.maskCanvas.height = this.videoHeight;
 
         // Set canvas style to fit screen
-        const aspectRatio = videoWidth / videoHeight;
+        const aspectRatio = this.videoWidth / this.videoHeight;
         const windowAspectRatio = window.innerWidth / window.innerHeight;
 
         let canvasWidth, canvasHeight;
@@ -101,34 +104,29 @@ export class SimpleCameraManager {
             canvasHeight = '100vh';
         }
 
-        // Apply the same styling to both canvases
+        // Apply styling to canvases (hidden since we only want SVG output)
         this.canvas.style.width = canvasWidth;
         this.canvas.style.height = canvasHeight;
+        this.canvas.style.display = 'none'; // Hide canvas since we only want SVG
         this.maskCanvas.style.width = canvasWidth;
         this.maskCanvas.style.height = canvasHeight;
+        this.maskCanvas.style.display = 'none'; // Hide mask canvas
 
         // Make sure SVG matches canvas dimensions and position
         const svg = document.getElementById('svg');
         if (svg) {
-            svg.setAttribute('width', videoWidth);
-            svg.setAttribute('height', videoHeight);
-            svg.setAttribute('viewBox', `0 0 ${videoWidth} ${videoHeight}`);
+            svg.setAttribute('width', this.videoWidth);
+            svg.setAttribute('height', this.videoHeight);
+            svg.setAttribute('viewBox', `0 0 ${this.videoWidth} ${this.videoHeight}`);
             // SVG will be positioned via CSS to overlay the canvas
         }
 
         console.log('Canvas setup:', {
-            videoWidth,
-            videoHeight,
+            videoWidth: this.videoWidth,
+            videoHeight: this.videoHeight,
             canvasStyle: {
                 width: this.canvas.style.width,
                 height: this.canvas.style.height
-            },
-            videoElement: {
-                readyState: this.video.readyState,
-                videoWidth: this.video.videoWidth,
-                videoHeight: this.video.videoHeight,
-                paused: this.video.paused,
-                currentTime: this.video.currentTime
             }
         });
     }
@@ -170,6 +168,27 @@ export class SimpleCameraManager {
         }
     }
 
+    async processFrame(frame) {
+        try {
+            // Create ImageBitmap from VideoFrame for efficient processing
+            const bitmap = await createImageBitmap(frame);
+            
+            // Send to MediaPipe if available
+            if (this.blazePose) {
+                await this.blazePose.send({ image: bitmap });
+            }
+
+            // Clean up
+            bitmap.close();
+            frame.close();
+
+        } catch (error) {
+            console.error('Frame processing error:', error);
+            // Always close the frame to prevent memory leaks
+            frame.close();
+        }
+    }
+
     onPoseResults(results) {
         if (results.segmentationMask) {
             this.drawBodyOutline(results.segmentationMask);
@@ -203,8 +222,8 @@ export class SimpleCameraManager {
                 // ArrayBuffer format - need to convert
                 const buffer = await segmentationMask.arrayBuffer();
                 const uint8Array = new Uint8Array(buffer);
-                width = this.video.videoWidth;
-                height = this.video.videoHeight;
+                width = this.videoWidth;
+                height = this.videoHeight;
                 imageData = {
                     data: uint8Array,
                     width: width,
@@ -269,49 +288,44 @@ export class SimpleCameraManager {
         }
     }
 
-
-    startProcessing() {
-        let frameCount = 0;
-        const processFrame = async () => {
-            if (!this.isProcessing) return;
-
-            try {
-                frameCount++;
-
-                // Only try pose segmentation if blazePose is initialized
-                if (this.blazePose && frameCount % 5 === 0) {
-                    try {
-                        // Send video frame to MediaPipe Pose
-                        await this.blazePose.send({ image: this.video });
-
-                        // Results will be handled by onPoseResults callback
-                    } catch (segError) {
-                        console.error('Segmentation error:', segError);
-                    }
-                }
-
-            } catch (error) {
-                console.error('Frame processing error:', error);
-                this.updateDebug(`Frame error: ${error.message}`);
-            }
-
-            this.animationId = requestAnimationFrame(processFrame);
-        };
-
+    async startProcessing() {
         this.isProcessing = true;
-        processFrame();
+        let frameCount = 0;
+
+        try {
+            while (this.isProcessing) {
+                const { done, value: frame } = await this.reader.read();
+                if (done) break;
+
+                frameCount++;
+                
+                // Process every 3rd frame for better performance
+                if (frameCount % 3 === 0) {
+                    await this.processFrame(frame);
+                } else {
+                    // Still need to close unused frames
+                    frame.close();
+                }
+            }
+        } catch (error) {
+            console.error('Stream processing error:', error);
+            this.updateDebug(`Stream error: ${error.message}`);
+        }
     }
 
     stop() {
         this.isProcessing = false;
-        if (this.animationId) {
-            cancelAnimationFrame(this.animationId);
+        
+        // Stop the stream reader
+        if (this.reader) {
+            this.reader.releaseLock();
+            this.reader = null;
         }
 
         // Stop video stream
-        if (this.video.srcObject) {
-            const tracks = this.video.srcObject.getTracks();
-            tracks.forEach(track => track.stop());
+        if (this.stream) {
+            this.stream.getTracks().forEach(track => track.stop());
+            this.stream = null;
         }
     }
 }

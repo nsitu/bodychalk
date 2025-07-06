@@ -278,15 +278,15 @@ export class ContourTracer {
             const current = contour[i];
             const next = contour[(i + 1) % contour.length];
             const nextNext = contour[(i + 2) % contour.length];
-            
+
             // Calculate midpoint between current and next
             const midX = (current[0] + next[0]) / 2;
             const midY = (current[1] + next[1]) / 2;
-            
+
             // Calculate midpoint between next and next-next
             const nextMidX = (next[0] + nextNext[0]) / 2;
             const nextMidY = (next[1] + nextNext[1]) / 2;
-            
+
             // Use next point as control point, next midpoint as end point
             pathData += `Q ${next[0]} ${next[1]} ${nextMidX} ${nextMidY} `;
         }

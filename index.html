@@ -38,20 +38,13 @@
         id="app"
         style="display: none;"
     >
-        <video
-            id="video"
-            autoplay
-            playsinline
-            muted
-            style="display: none;"
-        ></video>
         <canvas
             id="canvas"
-            style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 1;"
+            style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 1; display: none;"
         ></canvas>
         <canvas
             id="maskCanvas"
-            style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 2; mix-blend-mode: multiply;"
+            style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 2; display: none;"
         ></canvas>
         <svg
             id="svg"
