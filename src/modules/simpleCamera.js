@@ -25,6 +25,10 @@ export class SimpleCameraManager {
         this.frameProcessingCount = 0;
         this.modelPreloaded = false;
         this.modelPreloadPromise = null;
+
+        this.currentFacingMode = 'user'; // default
+        this.availableFacingModes = ['user'];
+        this.hasBothCameras = false;
     }
 
     updateDebug(message) {
@@ -36,14 +40,24 @@ export class SimpleCameraManager {
 
     async initialize() {
         try {
+            // Check available cameras first
+            const cameraInfo = await this.getAvailableCameras();
+            this.availableFacingModes = cameraInfo.facingModes;
+            this.hasBothCameras = cameraInfo.hasBothCameras;
+            
+            // Show camera toggle button if both cameras are available
+            if (this.hasBothCameras) {
+                this.showCameraToggle();
+            }
+            
             this.updateDebug('Requesting camera access...');
 
-            // Get user media stream
+            // Get user media stream with current facing mode
             this.stream = await navigator.mediaDevices.getUserMedia({
                 video: {
                     width: { ideal: this.videoWidth },
                     height: { ideal: this.videoHeight },
-                    facingMode: 'user'
+                    facingMode: this.currentFacingMode
                 }
             });
 
@@ -407,6 +421,139 @@ export class SimpleCameraManager {
         if (this.stream) {
             this.stream.getTracks().forEach(track => track.stop());
             this.stream = null;
+        }
+    }
+
+    async getAvailableCameras() {
+        try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoDevices = devices.filter(device => device.kind === 'videoinput');
+            
+            console.log('Available video devices:', videoDevices);
+            
+            // Test which facing modes are available
+            const availableFacingModes = [];
+            
+            // Test front camera (user)
+            try {
+                const userStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'user' }
+                });
+                availableFacingModes.push('user');
+                userStream.getTracks().forEach(track => track.stop());
+            } catch (e) {
+                console.log('User facing camera not available');
+            }
+            
+            // Test back camera (environment)
+            try {
+                const envStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment' }
+                });
+                availableFacingModes.push('environment');
+                envStream.getTracks().forEach(track => track.stop());
+            } catch (e) {
+                console.log('Environment facing camera not available');
+            }
+            
+            return {
+                devices: videoDevices,
+                facingModes: availableFacingModes,
+                hasBothCameras: availableFacingModes.length > 1
+            };
+        } catch (error) {
+            console.error('Error checking available cameras:', error);
+            return {
+                devices: [],
+                facingModes: ['user'], // fallback to user
+                hasBothCameras: false
+            };
+        }
+    }
+
+    async toggleCamera() {
+        try {
+            // Switch facing mode
+            this.currentFacingMode = this.currentFacingMode === 'user' ? 'environment' : 'user';
+            
+            this.updateDebug(`Switching to ${this.currentFacingMode} camera...`);
+            
+            // Stop current stream
+            if (this.stream) {
+                this.stream.getTracks().forEach(track => track.stop());
+            }
+            
+            // Stop current reader
+            if (this.reader) {
+                this.reader.releaseLock();
+                this.reader = null;
+            }
+            
+            // Get new stream with different facing mode
+            this.stream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                    width: { ideal: this.videoWidth },
+                    height: { ideal: this.videoHeight },
+                    facingMode: this.currentFacingMode
+                }
+            });
+            
+            // Set up new stream processor
+            const track = this.stream.getVideoTracks()[0];
+            const processor = new MediaStreamTrackProcessor({ track });
+            this.reader = processor.readable.getReader();
+            
+            // Update camera toggle button text
+            this.updateCameraToggleButton();
+            
+            // Resume processing
+            this.startProcessing();
+            
+            this.updateDebug(`Switched to ${this.currentFacingMode} camera`);
+            
+        } catch (error) {
+            console.error('Camera toggle failed:', error);
+            this.updateDebug(`Camera toggle failed: ${error.message}`);
+            
+            // Try to revert to previous camera
+            this.currentFacingMode = this.currentFacingMode === 'user' ? 'environment' : 'user';
+        }
+    }
+
+    showCameraToggle() {
+        // Create camera toggle button
+        const toggleButton = document.createElement('button');
+        toggleButton.id = 'cameraToggle';
+        toggleButton.textContent = `Switch to ${this.currentFacingMode === 'user' ? 'Back' : 'Front'} Camera`;
+        toggleButton.style.cssText = `
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+            z-index: 10;
+        `;
+        
+        toggleButton.addEventListener('click', () => {
+            this.toggleCamera();
+        });
+        
+        // Add to app container
+        const app = document.getElementById('app');
+        if (app) {
+            app.appendChild(toggleButton);
+        }
+    }
+
+    updateCameraToggleButton() {
+        const toggleButton = document.getElementById('cameraToggle');
+        if (toggleButton) {
+            toggleButton.textContent = `Switch to ${this.currentFacingMode === 'user' ? 'Back' : 'Front'} Camera`;
         }
     }
 }
