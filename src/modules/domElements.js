@@ -10,4 +10,4 @@ export const canvas = document.getElementById('canvas');
 export const maskCanvas = document.getElementById('maskCanvas');
 export const bodyPath = document.getElementById('bodyPath');
 export const debugElement = document.getElementById('debug');
-export const cameraToggle = document.getElementById('cameraToggle'); // Optional - created dynamically
+export const cameraToggle = document.getElementById('cameraToggle');

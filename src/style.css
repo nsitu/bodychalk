@@ -172,7 +172,10 @@ button {
     cursor: pointer;
     font-size: 12px;
     z-index: 10;
+    display: none;
+    /* Initially hidden */
     transition: background-color 0.3s;
+
 }
 
 #cameraToggle:hover {

@@ -1,4 +1,4 @@
-import { canvas, debugElement, maskCanvas, bodyPath } from './domElements.js';
+import { canvas, debugElement, maskCanvas, bodyPath, cameraToggle } from './domElements.js';
 import { ContourTracer } from './contour.js';
 
 export class SimpleCameraManager {
@@ -44,12 +44,15 @@ export class SimpleCameraManager {
             const cameraInfo = await this.getAvailableCameras();
             this.availableFacingModes = cameraInfo.facingModes;
             this.hasBothCameras = cameraInfo.hasBothCameras;
-            
+
             // Show camera toggle button if both cameras are available
             if (this.hasBothCameras) {
-                this.showCameraToggle();
+                cameraToggle.style.display = 'block';
+                cameraToggle.addEventListener('click', () => {
+                    this.toggleCamera();
+                });
             }
-            
+
             this.updateDebug('Requesting camera access...');
 
             // Get user media stream with current facing mode
@@ -186,7 +189,7 @@ export class SimpleCameraManager {
                 const ctx = canvas.getContext('2d');
                 ctx.fillStyle = 'black';
                 ctx.fillRect(0, 0, 64, 64);
-                
+
                 tempPose.onResults((results) => {
                     console.log('Model preload complete - received dummy results');
                     // Store the preloaded model
@@ -282,7 +285,7 @@ export class SimpleCameraManager {
     async processFrame(frame) {
         try {
             this.frameProcessingCount++;
-            
+
             // Show periodic updates about frame processing
             if (this.frameProcessingCount % 30 === 0) { // Every 30 frames (~1 second at 30fps)
                 this.updateDebug(`Processing frames... (${this.frameProcessingCount} processed)`);
@@ -428,12 +431,12 @@ export class SimpleCameraManager {
         try {
             const devices = await navigator.mediaDevices.enumerateDevices();
             const videoDevices = devices.filter(device => device.kind === 'videoinput');
-            
+
             console.log('Available video devices:', videoDevices);
-            
+
             // Test which facing modes are available
             const availableFacingModes = [];
-            
+
             // Test front camera (user)
             try {
                 const userStream = await navigator.mediaDevices.getUserMedia({
@@ -444,7 +447,7 @@ export class SimpleCameraManager {
             } catch (e) {
                 console.log('User facing camera not available');
             }
-            
+
             // Test back camera (environment)
             try {
                 const envStream = await navigator.mediaDevices.getUserMedia({
@@ -455,7 +458,7 @@ export class SimpleCameraManager {
             } catch (e) {
                 console.log('Environment facing camera not available');
             }
-            
+
             return {
                 devices: videoDevices,
                 facingModes: availableFacingModes,
@@ -475,20 +478,20 @@ export class SimpleCameraManager {
         try {
             // Switch facing mode
             this.currentFacingMode = this.currentFacingMode === 'user' ? 'environment' : 'user';
-            
+
             this.updateDebug(`Switching to ${this.currentFacingMode} camera...`);
-            
+
             // Stop current stream
             if (this.stream) {
                 this.stream.getTracks().forEach(track => track.stop());
             }
-            
+
             // Stop current reader
             if (this.reader) {
                 this.reader.releaseLock();
                 this.reader = null;
             }
-            
+
             // Get new stream with different facing mode
             this.stream = await navigator.mediaDevices.getUserMedia({
                 video: {
@@ -497,63 +500,26 @@ export class SimpleCameraManager {
                     facingMode: this.currentFacingMode
                 }
             });
-            
+
             // Set up new stream processor
             const track = this.stream.getVideoTracks()[0];
             const processor = new MediaStreamTrackProcessor({ track });
             this.reader = processor.readable.getReader();
-            
-            // Update camera toggle button text
-            this.updateCameraToggleButton();
-            
+
+
             // Resume processing
             this.startProcessing();
-            
+
             this.updateDebug(`Switched to ${this.currentFacingMode} camera`);
-            
+
         } catch (error) {
             console.error('Camera toggle failed:', error);
             this.updateDebug(`Camera toggle failed: ${error.message}`);
-            
+
             // Try to revert to previous camera
             this.currentFacingMode = this.currentFacingMode === 'user' ? 'environment' : 'user';
         }
     }
 
-    showCameraToggle() {
-        // Create camera toggle button
-        const toggleButton = document.createElement('button');
-        toggleButton.id = 'cameraToggle';
-        toggleButton.textContent = `Switch to ${this.currentFacingMode === 'user' ? 'Back' : 'Front'} Camera`;
-        toggleButton.style.cssText = `
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            background: rgba(0, 0, 0, 0.7);
-            color: white;
-            border: none;
-            padding: 10px 15px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 12px;
-            z-index: 10;
-        `;
-        
-        toggleButton.addEventListener('click', () => {
-            this.toggleCamera();
-        });
-        
-        // Add to app container
-        const app = document.getElementById('app');
-        if (app) {
-            app.appendChild(toggleButton);
-        }
-    }
 
-    updateCameraToggleButton() {
-        const toggleButton = document.getElementById('cameraToggle');
-        if (toggleButton) {
-            toggleButton.textContent = `Switch to ${this.currentFacingMode === 'user' ? 'Back' : 'Front'} Camera`;
-        }
-    }
 }

@@ -1,6 +1,11 @@
 import './modules/polyfillMSTP.js';
 import './style.css'
 
+// main.js
+import { loadIcons } from './modules/iconLoader.js';
+const iconNames = ['cameraswitch'];
+loadIcons(iconNames);
+
 import { startAppBtn, welcomeScreen, app } from './modules/domElements.js';
 import { SimpleCameraManager } from './modules/simpleCamera.js';
 
