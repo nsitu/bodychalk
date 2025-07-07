@@ -21,7 +21,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "marching-squares": "^1.0.0",
     "vite": "^7.0.2"
   }
 }

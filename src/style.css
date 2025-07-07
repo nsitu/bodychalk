@@ -113,7 +113,7 @@ button {
     display: flex;
     justify-content: center;
     align-items: center;
-    background: black;
+    background: black url('./pavement.jpg') center center / cover no-repeat;
 }
 
 /* Hide video and canvas for minimalist experience */
