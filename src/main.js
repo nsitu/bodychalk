@@ -3,10 +3,10 @@ import './style.css'
 
 // main.js
 import { loadIcons } from './modules/iconLoader.js';
-const iconNames = ['cameraswitch', 'download'];
+const iconNames = ['cameraswitch', 'download', 'colors'];
 loadIcons(iconNames);
 
-import { startAppBtn, welcomeScreen, app, loadingSpinner, cameraToggle } from './modules/domElements.js';
+import { startAppBtn, welcomeScreen, app, loadingSpinner, cameraToggle, randomColor, bodyPath, svgElement } from './modules/domElements.js';
 import { CameraManager } from './modules/camera.js';
 import { PoseProcessor } from './modules/poseProcessor.js';
 import { DownloadManager } from './modules/download.js';
@@ -72,6 +72,9 @@ startAppBtn.addEventListener('click', async () => {
         if (cameraManager.hasMultipleCamerasAvailable()) {
             cameraToggle.addEventListener('click', toggleCamera);
         }
+
+        // Set up random color button
+        randomColor.addEventListener('click', changeToRandomColor);
 
         // Start processing loop
         startProcessingLoop();
@@ -141,6 +144,42 @@ async function toggleCamera() {
         cameraToggle.disabled = false;
     }
 }
+
+// Generate random color
+function getRandomColor() {
+    const colors = [
+        '#ff0000', // red
+        '#00ff00', // green
+        '#0000ff', // blue
+        '#ffff00', // yellow
+        '#ff00ff', // magenta
+        '#00ffff', // cyan
+        '#ff8000', // orange
+        '#8000ff', // purple
+        '#ff0080', // pink
+        '#80ff00', // lime
+        '#0080ff', // light blue
+        '#ff8080', // light red
+        '#80ff80', // light green
+        '#8080ff', // light blue
+        '#ffff80', // light yellow
+        '#ff80ff', // light magenta
+        '#80ffff', // light cyan
+        '#ffffff', // white
+    ];
+
+    return colors[Math.floor(Math.random() * colors.length)];
+}
+
+// Random color functionality
+function changeToRandomColor() {
+    const newColor = getRandomColor();
+    svgElement.style.setProperty('--stroke-color', newColor);
+    console.log(`Changed stroke color to: ${newColor}`);
+}
+
+// Event listener for random color button
+randomColor.addEventListener('click', changeToRandomColor);
 
 // Cleanup on page unload
 window.addEventListener('beforeunload', () => {

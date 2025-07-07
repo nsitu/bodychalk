@@ -134,18 +134,22 @@ button {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
+    width: 100vw;
+    height: auto;
     max-width: 100%;
     max-height: 100%;
     object-fit: contain;
     z-index: 3;
     pointer-events: none;
+    --stroke-color: #00ff00;
+    /* Default green color */
 }
 
 #bodyPath {
-    stroke: #00ff00;
+    stroke: var(--stroke-color);
     stroke-width: 3;
     fill: none;
-    filter: drop-shadow(0 0 5px #00ff00);
+    filter: drop-shadow(0 0 5px var(--stroke-color));
 }
 
 #debug {
@@ -214,6 +218,33 @@ button {
 }
 
 #downloadFile:active {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+
+
+#randomColor {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 12px;
+    z-index: 10;
+    /* Initially hidden */
+    transition: background-color 0.3s;
+
+}
+
+#randomColor:hover {
+    background: rgba(0, 0, 0, 0.9);
+}
+
+#randomColor:active {
     background: rgba(255, 255, 255, 0.2);
 }
 

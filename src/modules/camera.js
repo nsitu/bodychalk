@@ -207,9 +207,7 @@ export class CameraManager {
     setupSVG() {
         const svg = document.getElementById('svg');
         if (svg) {
-            // Set SVG dimensions and viewBox
-            svg.setAttribute('width', '100vw');
-            svg.setAttribute('height', 'auto');
+            // Set SVG dimensions and viewBox 
             svg.setAttribute('viewBox', `0 0 ${this.videoWidth} ${this.videoHeight}`);
 
             // Mirror SVG for front camera
