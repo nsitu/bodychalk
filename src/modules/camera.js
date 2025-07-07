@@ -77,7 +77,8 @@ export class CameraManager {
             const devices = await navigator.mediaDevices.enumerateDevices();
             const videoDevices = devices.filter(device => device.kind === 'videoinput');
 
-            this.hasMultipleCameras = videoDevices.length > 1;
+            this.hasMultipleCameras = true
+            //this.hasMultipleCameras = videoDevices.length > 1;
 
             // Show camera toggle button if multiple cameras are available
             if (this.hasMultipleCameras) {
