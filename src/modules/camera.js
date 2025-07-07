@@ -150,6 +150,8 @@ export class CameraManager {
     async *getFrameStream() {
         this.isStreaming = true;
         let frameCount = 0;
+        const targetFPS = 15; // Reduce from 30fps for better performance
+        const frameInterval = Math.floor(30 / targetFPS); // Process every Nth frame
 
         try {
             while (this.isStreaming) {
@@ -158,8 +160,8 @@ export class CameraManager {
 
                 frameCount++;
 
-                // Yield every 3rd frame for processing, close others
-                if (frameCount % 3 === 0) {
+                // Process fewer frames but more efficiently
+                if (frameCount % frameInterval === 0) {
                     yield frame;
                 } else {
                     frame.close();

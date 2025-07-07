@@ -3,6 +3,8 @@ export class ContourTracer {
         this.threshold = options.threshold || 0.5;
         this.curveType = options.curveType || 'quadratic'; // 'straight' or 'quadratic'
         this.curveTension = options.curveTension || 0.5; // 0-1, affects curve smoothness
+        this.removeDuplicates = options.removeDuplicates !== false; // Default to true
+        this.overlapThreshold = options.overlapThreshold || 0.7; // Threshold for considering contours as pairs
     }
 
     extractContours(segmentation) {
@@ -57,15 +59,139 @@ export class ContourTracer {
             return [];
         }
 
-        // Find contours using edge detection
-        const contours = this.findContours(mask, width, height);
+        // Add frame edge padding to connect edge contours
+        const paddedMask = this.addFrameEdgePadding(mask, width, height);
+        
+        // Find contours on the padded mask
+        const contours = this.findContours(paddedMask, width, height);
 
         // Filter and simplify contours
         const filteredContours = contours
             .filter(contour => contour.length > 10) // Remove small contours
             .map(contour => this.simplifyContour(contour, 2)); // Simplify paths
 
-        return filteredContours;
+        // Remove duplicate contours (inner/outer pairs)
+        const deduplicatedContours = this.removeDuplicateContours(filteredContours);
+
+        return deduplicatedContours;
+    }
+
+    addFrameEdgePadding(mask, width, height) {
+        const paddedMask = [...mask]; // Copy original mask
+    
+        // Add background pixels (0) around the entire frame border
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const index = y * width + x;
+                
+                // If pixel is on the frame edge, set it to background
+                if (x === 0 || x === width - 1 || y === 0 || y === height - 1) {
+                    paddedMask[index] = 0;
+                }
+            }
+        }
+    
+        return paddedMask;
+    }
+
+    removeDuplicateContours(contours) {
+        if (contours.length <= 1) {
+            return contours;
+        }
+
+        // Calculate bounding boxes for all contours
+        const boundingBoxes = contours.map(contour => this.calculateBoundingBox(contour));
+        
+        // Find pairs of contours with overlapping bounding boxes
+        const pairs = [];
+        const paired = new Set();
+        
+        for (let i = 0; i < contours.length; i++) {
+            if (paired.has(i)) continue;
+            
+            for (let j = i + 1; j < contours.length; j++) {
+                if (paired.has(j)) continue;
+                
+                const overlap = this.calculateBoundingBoxOverlap(boundingBoxes[i], boundingBoxes[j]);
+                
+                // Consider contours as pairs if they have significant overlap (>70%)
+                if (overlap > 0.7) {
+                    pairs.push([i, j]);
+                    paired.add(i);
+                    paired.add(j);
+                    break; // Each contour can only be in one pair
+                }
+            }
+        }
+        
+        // Remove one contour from each pair (keep the first one)
+        const toRemove = new Set();
+        pairs.forEach(([first, second]) => {
+            toRemove.add(second); // Remove the second contour from each pair
+        });
+        
+        // Remove any lone contours (contours that don't have pairs)
+        for (let i = 0; i < contours.length; i++) {
+            if (!paired.has(i)) {
+                toRemove.add(i); // Remove lone contours
+            }
+        }
+        
+        // Log deduplication results
+        if (Math.random() < 0.1) { // Log occasionally
+            console.log(`Contour deduplication: ${contours.length} → ${contours.length - toRemove.size} (removed ${toRemove.size} duplicates/lone contours)`);
+        }
+        
+        // Return contours that are not marked for removal
+        return contours.filter((_, index) => !toRemove.has(index));
+    }
+
+    calculateBoundingBox(contour) {
+        if (contour.length === 0) {
+            return { minX: 0, minY: 0, maxX: 0, maxY: 0, width: 0, height: 0, area: 0 };
+        }
+        
+        let minX = contour[0][0];
+        let minY = contour[0][1];
+        let maxX = contour[0][0];
+        let maxY = contour[0][1];
+        
+        for (let i = 1; i < contour.length; i++) {
+            const [x, y] = contour[i];
+            minX = Math.min(minX, x);
+            minY = Math.min(minY, y);
+            maxX = Math.max(maxX, x);
+            maxY = Math.max(maxY, y);
+        }
+        
+        const width = maxX - minX;
+        const height = maxY - minY;
+        const area = width * height;
+        
+        return { minX, minY, maxX, maxY, width, height, area };
+    }
+
+    calculateBoundingBoxOverlap(box1, box2) {
+        // Calculate intersection area
+        const intersectMinX = Math.max(box1.minX, box2.minX);
+        const intersectMinY = Math.max(box1.minY, box2.minY);
+        const intersectMaxX = Math.min(box1.maxX, box2.maxX);
+        const intersectMaxY = Math.min(box1.maxY, box2.maxY);
+        
+        // No overlap if intersection is invalid
+        if (intersectMinX >= intersectMaxX || intersectMinY >= intersectMaxY) {
+            return 0;
+        }
+        
+        const intersectWidth = intersectMaxX - intersectMinX;
+        const intersectHeight = intersectMaxY - intersectMinY;
+        const intersectArea = intersectWidth * intersectHeight;
+        
+        // Calculate union area
+        const unionArea = box1.area + box2.area - intersectArea;
+        
+        // Return overlap ratio (intersection over union)
+        return unionArea > 0 ? intersectArea / unionArea : 0;
     }
 
     findContours(mask, width, height) {
