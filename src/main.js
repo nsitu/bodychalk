@@ -65,7 +65,7 @@ startAppBtn.addEventListener('click', async () => {
 
         // Initialize pose processor with camera dimensions
         poseProcessor.setDimensions(cameraInfo.width, cameraInfo.height);
-        await poseProcessor.initializeBlazePose();
+        await poseProcessor.initializePoseLandmarker();
 
         // Initialize download manager
         downloadManager = new DownloadManager(cameraManager);

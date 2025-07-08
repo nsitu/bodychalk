@@ -151,7 +151,7 @@ export class CameraManager {
     async *getFrameStream() {
         this.isStreaming = true;
         let frameCount = 0;
-        const targetFPS = 15; // Reduce from 30fps for better performance
+        const targetFPS = 24; // Reduce from 30fps for better performance
         const frameInterval = Math.floor(30 / targetFPS); // Process every Nth frame
 
         try {
