@@ -7,6 +7,7 @@ export const app = document.getElementById('app');
 
 // Media elements
 export const svgElement = document.getElementById('svg');
+export const bodyGroup = document.getElementById('bodyGroup');
 export const bodyPath = document.getElementById('bodyPath');
 export const debugElement = document.getElementById('debug');
 export const cameraToggle = document.getElementById('cameraToggle');

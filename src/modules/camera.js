@@ -207,15 +207,21 @@ export class CameraManager {
 
     setupSVG() {
         const svg = document.getElementById('svg');
+        const bodyGroup = document.getElementById('bodyGroup');
+
         if (svg) {
             // Set SVG dimensions and viewBox 
             svg.setAttribute('viewBox', `0 0 ${this.videoWidth} ${this.videoHeight}`);
+            // Keep only the centering transform on the SVG element
+            svg.style.transform = 'translate(-50%, -50%)';
+        }
 
-            // Mirror SVG for front camera
+        if (bodyGroup) {
+            // Apply mirroring transform to the group for front camera
             if (this.currentFacingMode === 'user') {
-                svg.style.transform = 'translate(-50%, -50%) scaleX(-1)';
+                bodyGroup.setAttribute('transform', `translate(${this.videoWidth}, 0) scale(-1, 1)`);
             } else {
-                svg.style.transform = 'translate(-50%, -50%)';
+                bodyGroup.removeAttribute('transform');
             }
         }
     }

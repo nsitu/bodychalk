@@ -363,11 +363,31 @@ button {
 
 #shareConfirmDialog button {
     transition: all 0.3s ease;
-    min-width: 120px;
+}
+
+#shareConfirmCancel {
+    padding: 0.8rem 1.5rem;
+    border-radius: 1rem;
+    background: #666;
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    font-size: 1rem;
 }
 
 #shareConfirmCancel:hover {
     background: #777 !important;
+}
+
+#shareConfirmOK {
+    padding: 0.8rem 1.5rem;
+    border-radius: 1rem;
+    background: #ffd700;
+    color: #333;
+    border: none;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: bold;
 }
 
 #shareConfirmOK:hover {
@@ -377,4 +397,15 @@ button {
 #shareConfirmOK:active,
 #shareConfirmCancel:active {
     transform: scale(0.95);
+}
+
+
+#svgPreviewContainer {
+    max-width: 200px;
+    margin: 0 auto;
+}
+
+#svgPreviewContainer svg {
+    width: 100%;
+    height: auto;
 }
