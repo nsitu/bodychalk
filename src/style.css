@@ -409,3 +409,114 @@ button {
     width: 100%;
     height: auto;
 }
+
+/* Share result dialog styles */
+#shareResultDialog {
+    font-family: sans-serif;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.85);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 1002;
+}
+
+#shareResultDialog .dialog-content {
+    background: #222;
+    padding: 2rem;
+    border-radius: 1rem;
+    text-align: center;
+    max-width: 90%;
+    width: 400px;
+    color: #fff;
+    position: relative;
+}
+
+#shareResultDialog .close-button-container {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+}
+
+#shareResultDialog .close-button {
+    background: none;
+    border: none;
+    color: #999;
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.3s ease;
+}
+
+#shareResultDialog .close-button:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+}
+
+#shareResultDialog .success h3 {
+    color: #4caf50;
+    margin-bottom: 1rem;
+}
+
+#shareResultDialog .error h3 {
+    color: #f44336;
+    margin-bottom: 1rem;
+}
+
+#shareResultDialog .success-icon {
+    font-size: 3rem;
+    color: #4caf50;
+    margin-bottom: 1rem;
+}
+
+#shareResultDialog .error-icon {
+    font-size: 3rem;
+    color: #f44336;
+    margin-bottom: 1rem;
+}
+
+#shareResultDialog p {
+    margin: 1rem 0;
+    line-height: 1.5;
+}
+
+#shareResultDialog a {
+    color: #ffd700;
+    text-decoration: none;
+    font-weight: bold;
+}
+
+#shareResultDialog a:hover {
+    color: #ffed4e;
+    text-decoration: underline;
+}
+
+#shareResultContinue {
+    padding: 0.8rem 1.5rem;
+    border-radius: 1rem;
+    background: #ffd700;
+    color: #333;
+    border: none;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+
+#shareResultContinue:hover {
+    background: #ffed4e !important;
+}
+
+#shareResultContinue:active {
+    transform: scale(0.95);
+}

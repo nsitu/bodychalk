@@ -18,9 +18,7 @@ export class ShareManager {
     }
 
     setupConfirmationDialog() {
-
-
-        // Setup event listeners
+        // Setup event listeners for confirmation dialog
         document.getElementById('shareConfirmCancel').addEventListener('click', () => {
             this.hideConfirmationDialog();
         });
@@ -34,6 +32,18 @@ export class ShareManager {
         document.getElementById('shareConfirmDialog').addEventListener('click', (e) => {
             if (e.target.id === 'shareConfirmDialog') {
                 this.hideConfirmationDialog();
+            }
+        });
+
+        // Setup event listeners for result dialog
+        document.getElementById('shareResultClose').addEventListener('click', () => {
+            this.hideResultDialog();
+        });
+
+        // Close result dialog when clicking outside
+        document.getElementById('shareResultDialog').addEventListener('click', (e) => {
+            if (e.target.id === 'shareResultDialog') {
+                this.hideResultDialog();
             }
         });
     }
@@ -71,6 +81,51 @@ export class ShareManager {
 
     hideConfirmationDialog() {
         const dialog = document.getElementById('shareConfirmDialog');
+        if (dialog) {
+            dialog.style.display = 'none';
+        }
+    }
+
+    showResultDialog(success, message = '') {
+        const dialog = document.getElementById('shareResultDialog');
+        const content = document.getElementById('shareResultContent');
+
+        if (success) {
+            content.innerHTML = `
+                <div class="success">
+                    <div class="success-icon">✓</div>
+                    <h3>Thanks for sharing!</h3>
+                    <p>Your bodychalk has been successfully shared with the community.</p>
+                    <p>Check it out on the <a href="https://artsforall.co/bodychalk" target="_blank">Arts for All community page</a>.</p>
+                    <div style="display: flex; justify-content: center; margin-top: 2rem;">
+                        <button id="shareResultContinue">Continue</button>
+                    </div>
+                </div>
+            `;
+        } else {
+            content.innerHTML = `
+                <div class="error">
+                    <div class="error-icon">✗</div>
+                    <h3>Sharing Failed</h3>
+                    <p>We couldn't share your bodychalk at this time. Please try again later.</p>
+                    ${message ? `<p style="color: #999; font-size: 0.9em;">Error: ${message}</p>` : ''}
+                    <div style="display: flex; justify-content: center; margin-top: 2rem;">
+                        <button id="shareResultContinue">Continue</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        dialog.style.display = 'flex';
+
+        // Add event listener to the Continue button
+        document.getElementById('shareResultContinue').addEventListener('click', () => {
+            this.hideResultDialog();
+        });
+    }
+
+    hideResultDialog() {
+        const dialog = document.getElementById('shareResultDialog');
         if (dialog) {
             dialog.style.display = 'none';
         }
@@ -131,6 +186,9 @@ export class ShareManager {
                 this.cameraManager.updateDebug('Successfully shared to WordPress!');
                 shareFile.style.background = 'rgba(0, 255, 0, 0.7)'; // Green for success
                 console.log('Share successful:', result);
+
+                // Show success dialog
+                this.showResultDialog(true);
             } else {
                 throw new Error(result.message || 'Unknown error from server');
             }
@@ -139,12 +197,14 @@ export class ShareManager {
             console.error('Share failed:', error);
             this.cameraManager.updateDebug(`Share failed: ${error.message}`);
             shareFile.style.background = 'rgba(255, 0, 0, 0.7)'; // Red for error
+
+            // Show failure dialog
+            this.showResultDialog(false, error.message);
         } finally {
             // Reset button color after 2 seconds
             setTimeout(() => {
                 shareFile.style.background = 'rgba(0, 0, 0, 0.7)';
             }, 2000);
-
         }
     }
 
