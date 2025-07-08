@@ -12,5 +12,6 @@ export const debugElement = document.getElementById('debug');
 export const cameraToggle = document.getElementById('cameraToggle');
 export const downloadFile = document.getElementById('downloadFile');
 export const randomColor = document.getElementById('randomColor');
+export const shareFile = document.getElementById('shareFile');
 
 export const loadingSpinner = document.getElementById('loading-spinner');

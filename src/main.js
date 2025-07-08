@@ -3,17 +3,19 @@ import './style.css'
 
 // main.js
 import { loadIcons } from './modules/iconLoader.js';
-const iconNames = ['cameraswitch', 'download', 'colors'];
+const iconNames = ['cameraswitch', 'download', 'colors', 'share'];
 loadIcons(iconNames);
 
-import { startAppBtn, welcomeScreen, app, loadingSpinner, cameraToggle, randomColor, bodyPath, svgElement } from './modules/domElements.js';
+import { startAppBtn, welcomeScreen, app, loadingSpinner, cameraToggle, randomColor, bodyPath, svgElement, shareFile } from './modules/domElements.js';
 import { CameraManager } from './modules/camera.js';
 import { PoseProcessor } from './modules/poseProcessor.js';
 import { DownloadManager } from './modules/download.js';
+import { ShareManager } from './modules/share.js';
 
 let cameraManager = null;
 let poseProcessor = null;
 let downloadManager = null;
+let shareManager = null;
 let processingLoop = null;
 
 // Start preloading immediately when the page loads
@@ -67,6 +69,9 @@ startAppBtn.addEventListener('click', async () => {
 
         // Initialize download manager
         downloadManager = new DownloadManager(cameraManager);
+
+        // Initialize share manager
+        shareManager = new ShareManager(cameraManager);
 
         // Set up camera toggle if multiple cameras available
         if (cameraManager.hasMultipleCamerasAvailable()) {
