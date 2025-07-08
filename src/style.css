@@ -520,3 +520,8 @@ button {
 #shareResultContinue:active {
     transform: scale(0.95);
 }
+
+.welcome-footer a {
+    color: #eeeeee;
+    font-weight: normal;
+}
